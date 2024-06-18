@@ -120,6 +120,9 @@ function printFormattedHTML($data) {
     
 }
 // Uso de la clase ClickUpAPI
-$clickUp = new ClickUpAPI('API_KEY');
+// var API_KEY env
+require '.env';
+
+$clickUp = new ClickUpAPI($API_KEY);
 $workspacesStructure = $clickUp->getWorkspacesStructure();
 printFormattedHTML($workspacesStructure);

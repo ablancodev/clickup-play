@@ -59,12 +59,20 @@ class ClickUpAPI {
     public function getTasks($list_id) {
         return $this->makeRequest('https://api.clickup.com/api/v2/list/' . $list_id . '/task');
     }
+
+    //   CURLOPT_URL => "https://api.clickup.com/api/v2/team/" . teamId . "/time_entries?" . http_build_query($query),
+    public function getTimeEntries($team_id, $task_id, $assignes = []) {
+        return $this->makeRequest('https://api.clickup.com/api/v2/team/' . $team_id . '/time_entries?task_id=' . $task_id . '&assignee=' . implode(',', $assignes));
+    }
 }
 
-$clickUp = new ClickUpAPI('API_KEY');
+require '.env';
+
+$clickUp = new ClickUpAPI($API_KEY);
 
 $teams = $clickUp->getTeams();
-//var_dump($teams);
+
+$team_id = $teams['teams'][0]['id'];
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
@@ -83,11 +91,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
             }
         }
 
+        $assignes = [];
+        if (isset($task['assignees'])) {
+            foreach ($task['assignees'] as $assigne) {
+                var_dump($assigne);
+                $assignes[] = $assigne['id'];
+            }
+        }
+
+        // obtenemos sus entradas de tiempo
+        $timeEntries = $clickUp->getTimeEntries($team_id, $task['id'], $assignes);
+
         $taskData[] = [
             'name' => $task['name'],
             'start_date' => isset($task['start_date']) ? $task['start_date'] : null,
             'due_date' => isset($task['due_date']) ? $task['due_date'] : null,
-            'progress' => $progress['percent_completed']
+            'progress' => $progress['percent_completed'],
+            'time_entries' => $timeEntries['data']
         ];
     }
 
@@ -101,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
             $end = date('Y-m-d', $task['due_date'] / 1000);
             $duration = (strtotime($end) - strtotime($start)) / (60 * 60 * 24);
             $progressWidth = isset($task['progress']) ? $task['progress'] : 0;
+            $timeEntries = $task['time_entries'];
 
             echo "<div>";
             echo "<div class='font-semibold'>" . htmlspecialchars($task['name']) . "</div>";
@@ -109,6 +130,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
             echo "<div style='width:" . ($progressWidth) . "%' class='shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500'></div>";
             echo "</div>";
             echo "<div class='text-gray-600'>" . $start . " to " . $end . "</div>";
+
+            // Display time entries
+            //echo "<div class='mt-2'>";
+            //echo "<div class='font-semibold'>Time Entries</div>";
+            //echo "<ul>";
+            // totales por usuario
+            $totalTime = [];
+            foreach ($timeEntries as $timeEntry) {
+                if (!isset($totalTime[$timeEntry['user']['username']])) {
+                    $totalTime[$timeEntry['user']['username']] = 0;
+                }
+                $totalTime[$timeEntry['user']['username']] += $timeEntry['duration'];
+                //echo "<li>";
+                //echo "<strong>User:</strong> " . htmlspecialchars($timeEntry['user']['username']) . "<br>";
+                //echo "<strong>Duration:</strong> " . intval($timeEntry['duration'] / 60000) . " minutes<br>";
+                //echo "</li>";
+            }
+            //echo "</ul>";
+            //echo "</div>";
+
+            // totales
+            echo "<div class='mt-2'>";
+            echo "<div class='font-semibold'>Total Time</div>";
+            echo "<ul>";
+            foreach ($totalTime as $user => $time) {
+                echo "<li>";
+                echo "<strong>User:</strong> " . htmlspecialchars($user) . "<br>";
+                echo "<strong>Total Time:</strong> " . intval($time / 60000) . " minutes<br>";
+                // costes indicando un precio por hora de 30€
+                echo "<strong>Cost (30€ x hour):</strong> " . intval($time / 60000 / 60 * 30) . "€<br>";
+                echo "</li>";
+            }
+            echo "</ul>";
+            echo "</div>";
+
             echo "</div>";
             echo "</div>";
         }
@@ -120,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
 
 // Display the form
 $lists = $clickUp->getLists($teams['teams'][0]['id']);
+
 ?>
 
 <div class="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto">
