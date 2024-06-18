@@ -73,10 +73,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
     $taskData = [];
 
     foreach ($tasks['tasks'] as $task) {
+        $progress = null;
+        if (isset($task['custom_fields'])) {
+            foreach ($task['custom_fields'] as $field) {
+                if ($field['name'] === '⏳ Progreso') {
+                    $progress = $field['value'];
+                    break;
+                }
+            }
+        }
+
         $taskData[] = [
             'name' => $task['name'],
             'start_date' => isset($task['start_date']) ? $task['start_date'] : null,
             'due_date' => isset($task['due_date']) ? $task['due_date'] : null,
+            'progress' => $progress['percent_completed']
         ];
     }
 
@@ -89,11 +100,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['list_id'])) {
             $start = date('Y-m-d', $task['start_date'] / 1000);
             $end = date('Y-m-d', $task['due_date'] / 1000);
             $duration = (strtotime($end) - strtotime($start)) / (60 * 60 * 24);
+            $progressWidth = isset($task['progress']) ? $task['progress'] : 0;
+
             echo "<div>";
             echo "<div class='font-semibold'>" . htmlspecialchars($task['name']) . "</div>";
             echo "<div class='relative pt-1'>";
             echo "<div class='overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200'>";
-            echo "<div style='width:" . ($duration / 100) . "%' class='shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500'></div>";
+            echo "<div style='width:" . ($progressWidth) . "%' class='shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500'></div>";
             echo "</div>";
             echo "<div class='text-gray-600'>" . $start . " to " . $end . "</div>";
             echo "</div>";
